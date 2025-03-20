@@ -185,6 +185,18 @@ start_merkle_service() {
 build_and_run_light_node() {
     log_step "构建并运行LayerEdge Light Node"
     
+    # 检查并修复go.mod文件中的Go版本格式
+    if [ -f "go.mod" ]; then
+        log_info "检查go.mod文件..."
+        # 查找并修复go版本行，将类似1.23.1的格式改为1.23
+        if grep -q "go 1\..*\..*" go.mod; then
+            log_info "修复go.mod文件中的Go版本格式..."
+            # 使用sed将go 1.xx.x格式改为go 1.xx
+            sed -i -E 's/go ([0-9]+)\.([0-9]+)\.[0-9]+/go \1.\2/g' go.mod
+            log_info "go.mod文件已修复"
+        fi
+    fi
+    
     log_info "构建Light Node..."
     go build || { log_error "构建Light Node失败"; exit 1; }
     
