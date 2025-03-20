@@ -75,8 +75,36 @@ install_dependencies() {
     # 安装Risc0工具链
     log_info "安装Risc0工具链..."
     curl -L https://risczero.com/install | bash || { log_error "安装Risc0脚本下载失败"; exit 1; }
-    source $HOME/.bashrc
-    rzup install || { log_warn "Risc0工具链安装可能不完整，请检查"; }
+    
+    # 确保rzup命令在PATH中
+    export PATH="$HOME/.risc0/bin:$PATH"
+    
+    # 加载环境变量
+    if [ -f "$HOME/.bashrc" ]; then
+        source $HOME/.bashrc
+    fi
+    if [ -f "$HOME/.cargo/env" ]; then
+        source $HOME/.cargo/env
+    fi
+    
+    # 安装risc0工具链
+    if ! check_command rzup; then
+        log_error "rzup命令未找到，请确保安装脚本正确执行"
+        log_info "尝试手动安装risc0工具链..."
+        if [ -f "$HOME/.risc0/bin/rzup" ]; then
+            $HOME/.risc0/bin/rzup install || { log_error "Risc0工具链安装失败"; exit 1; }
+        else
+            log_error "找不到rzup工具，Risc0安装失败"; exit 1;
+        fi
+    else
+        log_info "执行rzup install..."
+        rzup install || { log_error "Risc0工具链安装失败"; exit 1; }
+    fi
+    
+    # 设置risc0环境变量
+    export RISC0_TOOLCHAIN_PATH="$HOME/.risc0/toolchain"
+    echo 'export PATH="$HOME/.risc0/bin:$PATH"' >> $HOME/.profile
+    echo 'export RISC0_TOOLCHAIN_PATH="$HOME/.risc0/toolchain"' >> $HOME/.profile
     
     log_info "所有依赖安装完成"
 }
@@ -119,8 +147,20 @@ EOL
 start_merkle_service() {
     log_step "启动Merkle服务"
     
+    # 确保环境变量正确设置
+    export PATH="$HOME/.risc0/bin:$PATH"
+    export RISC0_TOOLCHAIN_PATH="$HOME/.risc0/toolchain"
+    
     cd risc0-merkle-service
     log_info "构建Merkle服务..."
+    # 显示当前环境变量，帮助调试
+    log_info "当前RISC0_TOOLCHAIN_PATH: $RISC0_TOOLCHAIN_PATH"
+    log_info "检查risc0工具链是否可用..."
+    if ! check_command rzup; then
+        log_error "rzup命令未找到，请确保risc0工具链已正确安装"
+        exit 1
+    fi
+    
     cargo build || { log_error "构建Merkle服务失败"; exit 1; }
     
     log_info "启动Merkle服务..."
