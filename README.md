@@ -16,10 +16,10 @@
 ## 快速安装
 ```bash
 # 单条命令安装
-curl -sL https://raw.githubusercontent.com/fishzone24/layeredge-CLI/main/install_layeredge.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/fishzone24/layeredge-CLI/refs/heads/master/install_layeredge.sh | sudo bash
 
 # 备选分步安装（如需）：
-# wget https://raw.githubusercontent.com/fishzone24/layeredge-CLI/main/install_layeredge.sh
+# wget https://raw.githubusercontent.com/fishzone24/layeredge-CLI/refs/heads/master/install_layeredge.sh
 # chmod +x install_layeredge.sh
 # sudo ./install_layeredge.sh
 ```
