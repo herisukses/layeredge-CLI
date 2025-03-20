@@ -151,30 +151,112 @@ start_merkle_service() {
     export PATH="$HOME/.risc0/bin:$PATH"
     export RISC0_TOOLCHAIN_PATH="$HOME/.risc0/toolchain"
     
-    cd risc0-merkle-service
-    log_info "构建Merkle服务..."
-    # 显示当前环境变量，帮助调试
-    log_info "当前RISC0_TOOLCHAIN_PATH: $RISC0_TOOLCHAIN_PATH"
-    log_info "检查risc0工具链是否可用..."
-    if ! check_command rzup; then
-        log_error "rzup命令未找到，请确保risc0工具链已正确安装"
+    # 检查目录是否存在
+    if [ ! -d "risc0-merkle-service" ]; then
+        log_error "risc0-merkle-service目录不存在，请确保仓库克隆正确"
         exit 1
     fi
     
-    cargo build || { log_error "构建Merkle服务失败"; exit 1; }
+    cd risc0-merkle-service
+    log_info "构建Merkle服务..."
     
+    # 显示当前环境变量和系统信息，帮助调试
+    log_info "当前RISC0_TOOLCHAIN_PATH: $RISC0_TOOLCHAIN_PATH"
+    log_info "当前PATH: $PATH"
+    log_info "系统信息: $(uname -a)"
+    log_info "检查risc0工具链是否可用..."
+    
+    # 检查rzup命令
+    if ! check_command rzup; then
+        log_warn "rzup命令未找到，尝试从.risc0/bin目录直接使用"
+        if [ -f "$HOME/.risc0/bin/rzup" ]; then
+            log_info "找到rzup: $HOME/.risc0/bin/rzup"
+            $HOME/.risc0/bin/rzup --version || log_warn "rzup版本检查失败"
+        else
+            log_error "rzup命令未找到，请确保risc0工具链已正确安装"
+            exit 1
+        fi
+    else
+        log_info "rzup版本: $(rzup --version 2>&1 || echo '无法获取版本')"
+    fi
+    
+    # 检查cargo命令
+    if ! check_command cargo; then
+        log_error "cargo命令未找到，请确保Rust已正确安装"
+        exit 1
+    else
+        log_info "Cargo版本: $(cargo --version)"
+    fi
+    
+    # 构建前清理
+    log_info "清理之前的构建..."
+    cargo clean
+    
+    # 构建服务
+    log_info "构建Merkle服务..."
+    cargo build --verbose || { log_error "构建Merkle服务失败"; exit 1; }
+    
+    # 检查是否有旧的进程在运行
+    if [ -f "merkle-service.pid" ]; then
+        OLD_PID=$(cat merkle-service.pid)
+        if ps -p $OLD_PID > /dev/null; then
+            log_warn "发现旧的Merkle服务进程(PID: $OLD_PID)，正在停止..."
+            kill $OLD_PID 2>/dev/null || log_warn "无法停止旧进程，可能需要手动终止"
+            sleep 2
+        fi
+    fi
+    
+    # 启动服务
     log_info "启动Merkle服务..."
     log_warn "Merkle服务将在后台运行，日志将输出到merkle-service.log"
-    nohup cargo run > merkle-service.log 2>&1 &
+    
+    # 使用更详细的日志记录
+    echo "启动时间: $(date)" > merkle-service.log
+    echo "环境变量: RISC0_TOOLCHAIN_PATH=$RISC0_TOOLCHAIN_PATH" >> merkle-service.log
+    echo "系统信息: $(uname -a)" >> merkle-service.log
+    
+    # 启动服务并重定向所有输出
+    nohup cargo run --verbose > merkle-service.log 2>&1 &
     MERKLE_PID=$!
     echo $MERKLE_PID > merkle-service.pid
     
-    log_info "等待Merkle服务初始化..."
-    sleep 10
+    log_info "Merkle服务进程已启动(PID: $MERKLE_PID)，等待服务初始化..."
+    
+    # 增加等待时间并添加进度指示
+    WAIT_TIME=30
+    for i in $(seq 1 $WAIT_TIME); do
+        if ! ps -p $MERKLE_PID > /dev/null; then
+            log_error "Merkle服务进程已终止，启动失败"
+            log_info "查看日志内容:"
+            tail -n 20 merkle-service.log
+            exit 1
+        fi
+        
+        # 每5秒检查一次日志中是否有成功启动的标志
+        if [ $((i % 5)) -eq 0 ]; then
+            if grep -q "Listening on" merkle-service.log 2>/dev/null; then
+                log_info "Merkle服务已成功启动，监听端口已打开"
+                break
+            fi
+            log_info "等待中... $i/$WAIT_TIME 秒"
+        fi
+        sleep 1
+    done
+    
+    # 最终检查
     if ps -p $MERKLE_PID > /dev/null; then
-        log_info "Merkle服务已成功启动，PID: $MERKLE_PID"
+        # 检查日志中是否有错误信息
+        if grep -i "error\|panic\|failed" merkle-service.log; then
+            log_warn "Merkle服务进程正在运行，但日志中发现错误信息，请检查"
+            log_info "最近的日志内容:"
+            tail -n 10 merkle-service.log
+        else
+            log_info "Merkle服务已成功启动，PID: $MERKLE_PID"
+        fi
     else
         log_error "Merkle服务启动失败，请检查merkle-service.log"
+        log_info "日志内容:"
+        cat merkle-service.log
         exit 1
     fi
     
@@ -290,18 +372,28 @@ EOL
 check_service() {
     local pid_file=$1
     local service_name=$2
+    local log_file=$3
     
     if [ -f "$pid_file" ]; then
         PID=$(cat $pid_file)
         if ps -p $PID > /dev/null; then
-            echo "$service_name 正在运行 (PID: $PID)"
+            echo -e "${GREEN}✓${NC} $service_name 正在运行 (PID: $PID)"
+            
+            # 检查日志中是否有错误
+            if [ -f "$log_file" ] && grep -q -i "error\|panic\|failed\|exception" "$log_file"; then
+                echo -e "${YELLOW}!${NC} 警告: $service_name 日志中发现错误信息，请检查 $log_file"
+            fi
             return 0
         else
-            echo "$service_name 不在运行状态，但PID文件存在"
+            echo -e "${RED}✗${NC} $service_name 不在运行状态，但PID文件存在"
+            if [ -f "$log_file" ]; then
+                echo -e "${YELLOW}!${NC} 最近的日志内容 ($log_file):"
+                tail -n 5 "$log_file"
+            fi
             return 1
         fi
     else
-        echo "$service_name 未启动 (PID文件不存在)"
+        echo -e "${RED}✗${NC} $service_name 未启动 (PID文件不存在)"
         return 1
     fi
 }
@@ -309,8 +401,8 @@ check_service() {
 echo "LayerEdge服务状态:"
 echo "-------------------"
 
-check_service "risc0-merkle-service/merkle-service.pid" "Merkle服务"
-check_service "light-node.pid" "Light Node"
+check_service "risc0-merkle-service/merkle-service.pid" "Merkle服务" "risc0-merkle-service/merkle-service.log"
+check_service "light-node.pid" "Light Node" "light-node.log"
 
 echo "\n日志文件:"
 echo "-------------------"
