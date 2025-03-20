@@ -1,41 +1,40 @@
-# LayerEdge CLI Light Node
+# Node Cahaya CLI LayerEdge
 
-一键部署LayerEdge CLI轻节点到Ubuntu系统
+Terapkan node lampu LayerEdge CLI ke sistem Ubuntu dengan satu klik
 
-## 功能特性
-- 自动安装Go/Rust等编译依赖
-- 配置Risc0零知识证明环境
-- 部署Merkle验证服务
-- 提供节点管理脚本(启动/停止/状态查看)
-- 集成LayerEdge Dashboard连接
+## Fitur
+- Secara otomatis menginstal Go/Rust dan dependensi kompilasi lainnya
+- Konfigurasikan lingkungan bukti tanpa pengetahuan Risc0
+- Menyebarkan layanan verifikasi Merkle
+- Menyediakan skrip manajemen node (tampilan mulai/berhenti/status)
+- Koneksi Dasbor LayerEdge Terintegrasi
 
-## 系统要求
+## System Requirements
 - Ubuntu 20.04/22.04 LTS
-- 4核CPU / 8GB内存 / 50GB存储
+- 4-core CPU / 8GB RAM / 50GB storage
 
-## 快速安装
+## Quick Installation
 ```bash
-# 单条命令安装
+# Single command installation
 curl -sL https://raw.githubusercontent.com/fishzone24/layeredge-CLI/refs/heads/master/install_layeredge.sh | sudo bash
 
-# 备选分步安装（如需）：
+# Alternative step-by-step installation (if needed):
 # wget https://raw.githubusercontent.com/fishzone24/layeredge-CLI/refs/heads/master/install_layeredge.sh
 # chmod +x install_layeredge.sh
 # sudo ./install_layeredge.sh
 ```
-
-## 使用说明
-安装完成后：
-1. 编辑.env文件配置私钥
+## Instructions
+After installation:
+1. Edit the .env file to configure the private key
 ```nano .env```
-2. 使用管理脚本：
-- 检查状态 ```./status_layeredge.sh```
-- 停止服务 ```./stop_layeredge.sh```
-- 重启服务 ```./restart_layeredge.sh```
+2. Use the management script:
+- Check the status ```./status_layeredge.sh```
+- Stop the service ```./stop_layeredge.sh```
+- Restart the service ```./restart_layeredge.sh```
 
-## 安全提示
-⚠️ 请妥善保管PRIVATE_KEY配置
-⚠️ 建议在防火墙开放3001端口(TCP)
+## Security Tips
+⚠️ Please keep the PRIVATE_KEY configuration properly
+⚠️ It is recommended to open port 3001 (TCP) in the firewall
 
-## 技术支持
-访问[LayerEdge Dashboard](https://dashboard.layeredge.io) 查看节点状态
+## Technical Support
+Visit [LayerEdge Dashboard](https://dashboard.layeredge.io) to view the node status
